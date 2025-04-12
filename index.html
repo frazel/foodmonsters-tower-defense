@@ -1,0 +1,198 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FoodMonsters Tower Defense</title>
+  <style>
+    body {
+      margin: 0;
+      background: #222;
+      color: #fff;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      background: #111;
+    }
+    #leaderboard {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <div id="leaderboard">
+    <h3>Leaderboard</h3>
+    <ol id="scores"></ol>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const burgerImg = new Image();
+    burgerImg.src = "assets/burgerwalkss.gif";
+
+    const enemies = [];
+    const towers = [];
+    const bullets = [];
+    let money = 100;
+    let score = 0;
+    let wave = 1;
+
+    class Enemy {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 64;
+        this.height = 64;
+        this.health = 20 + wave * 10;
+        this.speed = 1 + wave * 0.1;
+      }
+      update() {
+        this.x += this.speed;
+      }
+      draw() {
+        ctx.drawImage(burgerImg, this.x, this.y, this.width, this.height);
+      }
+    }
+
+    class Tower {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.range = 100;
+        this.damage = 10;
+        this.cooldown = 0;
+      }
+      update() {
+        if (this.cooldown > 0) this.cooldown--;
+        for (let enemy of enemies) {
+          const dx = enemy.x - this.x;
+          const dy = enemy.y - this.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < this.range && this.cooldown === 0) {
+            bullets.push(new Bullet(this.x, this.y, enemy));
+            this.cooldown = 60;
+            break;
+          }
+        }
+      }
+      draw() {
+        ctx.fillStyle = "lime";
+        ctx.fillRect(this.x - 10, this.y - 10, 20, 20);
+      }
+    }
+
+    class Bullet {
+      constructor(x, y, target) {
+        this.x = x;
+        this.y = y;
+        this.target = target;
+        this.speed = 5;
+      }
+      update() {
+        const dx = this.target.x - this.x;
+        const dy = this.target.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 10) {
+          this.target.health -= 10;
+          bullets.splice(bullets.indexOf(this), 1);
+          return;
+        }
+        this.x += (dx / dist) * this.speed;
+        this.y += (dy / dist) * this.speed;
+      }
+      draw() {
+        ctx.fillStyle = "yellow";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function spawnEnemyWave() {
+      for (let i = 0; i < wave * 3; i++) {
+        enemies.push(new Enemy(-i * 100, Math.random() * canvas.height));
+      }
+    }
+
+    function updateGame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let tower of towers) {
+        tower.update();
+        tower.draw();
+      }
+
+      for (let bullet of bullets) {
+        bullet.update();
+        bullet.draw();
+      }
+
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        e.update();
+        if (e.health <= 0) {
+          money += 10;
+          score += 50;
+          enemies.splice(i, 1);
+          continue;
+        }
+        if (e.x > canvas.width) {
+          gameOver();
+          return;
+        }
+        e.draw();
+      }
+
+      requestAnimationFrame(updateGame);
+    }
+
+    function gameOver() {
+      alert("Game Over! Final Score: " + score);
+      updateLeaderboard(score);
+      score = 0;
+      money = 100;
+      wave = 1;
+      enemies.length = 0;
+      towers.length = 0;
+      bullets.length = 0;
+    }
+
+    function updateLeaderboard(score) {
+      const scores = JSON.parse(localStorage.getItem("scores") || "[]");
+      scores.push(score);
+      scores.sort((a, b) => b - a);
+      localStorage.setItem("scores", JSON.stringify(scores.slice(0, 5)));
+      const ol = document.getElementById("scores");
+      ol.innerHTML = scores.map(s => `<li>${s}</li>`).join("");
+    }
+
+    canvas.addEventListener("click", e => {
+      if (money >= 50) {
+        towers.push(new Tower(e.offsetX, e.offsetY));
+        money -= 50;
+      }
+    });
+
+    setInterval(() => {
+      wave++;
+      spawnEnemyWave();
+    }, 10000);
+
+    updateLeaderboard(0);
+    spawnEnemyWave();
+    updateGame();
+  </script>
+</body>
+</html>
