@@ -26,6 +26,14 @@
       padding: 10px;
       border-radius: 5px;
     }
+    #instructions {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 5px;
+    }
   </style>
 </head>
 <body>
@@ -33,6 +41,10 @@
   <div id="leaderboard">
     <h3>Leaderboard</h3>
     <ol id="scores"></ol>
+  </div>
+  <div id="instructions">
+    <h4>Instructions</h4>
+    <p>Click to place a tower<br/>Right-click a tower to upgrade<br/>1 Kill = 1 Tower</p>
   </div>
 
   <script>
@@ -48,9 +60,10 @@
     const enemies = [];
     const towers = [];
     const bullets = [];
-    let money = 100;
     let score = 0;
     let wave = 1;
+    let spawnInterval = 2000; // milliseconds
+    let lastSpawn = Date.now();
 
     const path = [
       { x: 0, y: 300 },
@@ -86,14 +99,22 @@
         this.range = 100;
         this.damage = 10;
         this.cooldown = 0;
-        this.health = 100;
+        this.maxHealth = 100;
+        this.health = this.maxHealth;
       }
       upgrade() {
-        if (money >= 100) {
+        if (score >= 2) {
           this.damage += 5;
           this.range += 10;
           this.health += 20;
-          money -= 100;
+          this.maxHealth += 20;
+          score -= 2;
+        }
+      }
+      takeDamage(amount) {
+        this.health -= amount;
+        if (this.health <= 0) {
+          towers.splice(towers.indexOf(this), 1);
         }
       }
       update() {
@@ -103,7 +124,7 @@
           const dy = enemy.y - this.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < this.range && this.cooldown === 0) {
-            bullets.push(new Bullet(this.x, this.y, enemy));
+            bullets.push(new Bullet(this.x, this.y, enemy, this.damage));
             this.cooldown = 60;
             break;
           }
@@ -111,22 +132,27 @@
       }
       draw() {
         ctx.drawImage(towerImg, this.x - 16, this.y - 16, 32, 32);
+        ctx.fillStyle = "darkred";
+        ctx.fillRect(this.x - 16, this.y + 20, 32, 4);
+        ctx.fillStyle = "lime";
+        ctx.fillRect(this.x - 16, this.y + 20, 32 * (this.health / this.maxHealth), 4);
       }
     }
 
     class Bullet {
-      constructor(x, y, target) {
+      constructor(x, y, target, damage) {
         this.x = x;
         this.y = y;
         this.target = target;
         this.speed = 5;
+        this.damage = damage;
       }
       update() {
         const dx = this.target.x - this.x;
         const dy = this.target.y - this.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < 10) {
-          this.target.health -= 10;
+          this.target.health -= this.damage;
           bullets.splice(bullets.indexOf(this), 1);
           return;
         }
@@ -147,16 +173,20 @@
       }
     }
 
-    function spawnEnemyWave() {
-      for (let i = 0; i < wave * 3; i++) {
-        enemies.push(new Enemy());
-      }
+    function spawnEnemy() {
+      enemies.push(new Enemy());
     }
 
     function updateGame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       drawGrid();
+
+      const now = Date.now();
+      if (now - lastSpawn > spawnInterval) {
+        spawnEnemy();
+        lastSpawn = now;
+        if (spawnInterval > 500) spawnInterval -= 25;
+      }
 
       for (let tower of towers) {
         tower.update();
@@ -172,8 +202,7 @@
         const e = enemies[i];
         e.update();
         if (e.health <= 0) {
-          money += 10;
-          score += 50;
+          score++;
           enemies.splice(i, 1);
           continue;
         }
@@ -191,8 +220,8 @@
       alert("Game Over! Final Score: " + score);
       updateLeaderboard(score);
       score = 0;
-      money = 100;
       wave = 1;
+      spawnInterval = 2000;
       enemies.length = 0;
       towers.length = 0;
       bullets.length = 0;
@@ -208,28 +237,31 @@
     }
 
     canvas.addEventListener("click", e => {
-      if (money >= 50) {
-        const tower = new Tower(e.offsetX, e.offsetY);
-        towers.push(tower);
-        money -= 50;
-
-        canvas.addEventListener("contextmenu", event => {
-          event.preventDefault();
-          tower.upgrade();
-        });
+      if (score >= 1) {
+        towers.push(new Tower(e.offsetX, e.offsetY));
+        score--;
       }
     });
 
-    setInterval(() => {
-      wave++;
-      spawnEnemyWave();
-    }, 10000);
+    canvas.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      for (let tower of towers) {
+        const dx = tower.x - e.offsetX;
+        const dy = tower.y - e.offsetY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 20) {
+          tower.upgrade();
+          break;
+        }
+      }
+    });
 
     updateLeaderboard(0);
-    spawnEnemyWave();
+    spawnEnemy();
     updateGame();
   </script>
 </body>
 </html>
+
 
 
