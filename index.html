@@ -3,262 +3,348 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FoodMonsters Tower Defense</title>
+  <title>Tower Defense Game</title>
   <style>
-    body {
-      margin: 0;
-      background: #222;
-      color: #fff;
-      font-family: sans-serif;
-      overflow: hidden;
-    }
-    canvas {
-      display: block;
-      margin: auto;
+    body { margin: 0; padding: 0; text-align: center; background: #000; }
+    #gameCanvas {
       background: url('https://imgur.com/ARaVPJV.png') no-repeat center center;
       background-size: cover;
+      display: block;
+      margin: auto;
     }
-    #leaderboard {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(0,0,0,0.7);
-      padding: 10px;
-      border-radius: 5px;
+    #ui {
+      position: fixed; top: 10px; left: 10px;
+      background: rgba(0,0,0,0.5); color: #fff;
+      padding: 10px; font-family: sans-serif; font-size: 14px;
+      text-align: left; border-radius: 5px;
     }
-    #instructions {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(0,0,0,0.7);
-      padding: 10px;
-      border-radius: 5px;
-    }
+    #ui small { font-size: 11px; color: #ccc; }
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="800" height="600"></canvas>
-  <div id="leaderboard">
-    <h3>Leaderboard</h3>
-    <ol id="scores"></ol>
+  <canvas id="gameCanvas" width="800" height="500"></canvas>
+  <div id="ui">
+    Score: <span id="score">0</span><br>
+    Gold: <span id="gold">0</span><br>
+    Wave: <span id="wave">0</span><br>
+    Next wave in: <span id="nextWave">0</span>s<br>
+    <small>Left-click to place tower, Right-click a tower to upgrade</small>
   </div>
-  <div id="instructions">
-    <h4>Instructions</h4>
-    <p>Click to place a tower<br/>Right-click a tower to upgrade<br/>1 Kill = 1 Tower</p>
-  </div>
-
   <script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-
-    const enemyImg = new Image();
-    enemyImg.src = "https://imgur.com/hNQo8cQ.png";
-
-    const towerImg = new Image();
-    towerImg.src = "https://imgur.com/wLQWu8s.png";
-
-    const enemies = [];
-    const towers = [];
-    const bullets = [];
-    let score = 0;
-    let wave = 1;
-    let spawnInterval = 2000; // milliseconds
-    let lastSpawn = Date.now();
-
-    const path = [
-      { x: 0, y: 300 },
-      { x: 800, y: 300 }
-    ];
-
-    class Enemy {
-      constructor() {
-        this.x = path[0].x;
-        this.y = path[0].y;
-        this.width = 64;
-        this.height = 64;
-        this.maxHealth = 40 + wave * 20;
-        this.health = this.maxHealth;
-        this.speed = 1 + wave * 0.2;
-      }
-      update() {
-        this.x += this.speed;
-      }
-      draw() {
-        ctx.drawImage(enemyImg, this.x, this.y, this.width, this.height);
-        ctx.fillStyle = "red";
-        ctx.fillRect(this.x, this.y - 10, this.width, 5);
-        ctx.fillStyle = "lime";
-        ctx.fillRect(this.x, this.y - 10, this.width * (this.health / this.maxHealth), 5);
-      }
-    }
-
-    class Tower {
-      constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.range = 100;
-        this.damage = 10;
-        this.cooldown = 0;
-        this.maxHealth = 100;
-        this.health = this.maxHealth;
-      }
-      upgrade() {
-        if (score >= 2) {
-          this.damage += 5;
-          this.range += 10;
-          this.health += 20;
-          this.maxHealth += 20;
-          score -= 2;
+    // Immediately Invoked Function to avoid globals
+    (() => {
+      /** Game Constants and Initial Settings **/
+      const CANVAS_WIDTH = 800, CANVAS_HEIGHT = 500;
+      const TOWER_SIZE = 40, ENEMY_SIZE = 40;
+      const TOWER_COST = 50, BASE_UPGRADE_COST = 50;
+      const ENEMY_BASE_HP = 50, ENEMY_HP_INCREMENT = 10;
+      const ENEMY_BASE_SPEED = 50, ENEMY_SPEED_INCREMENT = 5;
+      const ENEMY_GOLD_DROP = 20;
+      const TOWER_DAMAGE = 20, TOWER_RANGE = 100, TOWER_FIRE_RATE = 1.0;
+      const TOWER_INITIAL_HP = 100, ENEMY_DAMAGE_TO_TOWER = 50;
+      // Game State Variables
+      let score = 0;
+      let gold = 100;
+      let currentWave = 0;
+      let waveActive = false;
+      let nextWaveTime = 3;  // seconds before first wave
+      let enemiesToSpawn = 0;
+      let spawnCount = 0;
+      const spawnInterval = 0.5;  // interval (seconds) between enemy spawns in a wave
+      let spawnTimer = 0;
+      // Game Object Arrays
+      const towers = [];
+      const enemies = [];
+      const bullets = [];
+      // Path waypoints for enemies (defines the route with a vertical segment)
+      const path = [
+        { x: 0, y: 250 },    // Start at left middle
+        { x: 400, y: 250 },  // Move horizontally to middle
+        { x: 400, y: 400 },  // Move vertically down
+        { x: 800, y: 400 }   // Move horizontally to right exit
+      ];
+      // Canvas and UI element references
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const scoreEl = document.getElementById('score');
+      const goldEl = document.getElementById('gold');
+      const waveEl = document.getElementById('wave');
+      const nextWaveEl = document.getElementById('nextWave');
+      // Load tower and enemy images
+      const towerImg = new Image();
+      const enemyImg = new Image();
+      towerImg.src = "https://imgur.com/wLQWu8s.png";
+      enemyImg.src = "https://imgur.com/hNQo8cQ.png";
+      let assetsLoaded = 0;
+      // Start game loop when images are loaded
+      towerImg.onload = enemyImg.onload = () => {
+        assetsLoaded++;
+        if (assetsLoaded === 2) {
+          requestAnimationFrame(gameLoop);
         }
+      };
+      // Disable context menu on right-click (to use right-click for upgrades)
+      canvas.addEventListener('contextmenu', e => e.preventDefault());
+      /** Helper function: distance between two points **/
+      function dist(ax, ay, bx, by) {
+        return Math.hypot(bx - ax, by - ay);
       }
-      takeDamage(amount) {
-        this.health -= amount;
-        if (this.health <= 0) {
-          towers.splice(towers.indexOf(this), 1);
+      /** Spawn a new enemy at the start of the path **/
+      function spawnEnemy() {
+        const hp = ENEMY_BASE_HP + (currentWave - 1) * ENEMY_HP_INCREMENT;
+        const speed = ENEMY_BASE_SPEED + (currentWave - 1) * ENEMY_SPEED_INCREMENT;
+        const spawnX = path[0].x, spawnY = path[0].y;
+        enemies.push({
+          x: spawnX,
+          y: spawnY,
+          hp: hp,
+          maxHp: hp,
+          speed: speed,
+          waypointIndex: 1,  // next waypoint to move toward
+          remove: false
+        });
+      }
+      /** Start the next wave of enemies **/
+      function startWave() {
+        waveActive = true;
+        currentWave += 1;
+        spawnCount = 0;
+        enemiesToSpawn = currentWave * 3 + 1;  // e.g., wave 1:4 enemies, wave 2:7, etc.
+        spawnTimer = 0;
+      }
+      /** Event: Left-click to place a new tower **/
+      canvas.addEventListener('click', e => {
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        // If clicking on an existing tower, do nothing (avoid stacking towers on same spot)
+        for (let tower of towers) {
+          if (Math.abs(cx - tower.x) < TOWER_SIZE/2 && Math.abs(cy - tower.y) < TOWER_SIZE/2) {
+            return;
+          }
         }
-      }
-      update() {
-        if (this.cooldown > 0) this.cooldown--;
-        for (let enemy of enemies) {
-          const dx = enemy.x - this.x;
-          const dy = enemy.y - this.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < this.range && this.cooldown === 0) {
-            bullets.push(new Bullet(this.x, this.y, enemy, this.damage));
-            this.cooldown = 60;
+        if (gold >= TOWER_COST) {
+          // Ensure no placement too close to another tower
+          for (let tower of towers) {
+            if (dist(cx, cy, tower.x, tower.y) < TOWER_SIZE) {
+              return; // too near an existing tower
+            }
+          }
+          // Spend gold and add a new tower
+          gold -= TOWER_COST;
+          // Clamp tower position within canvas bounds
+          const tx = Math.max(TOWER_SIZE/2, Math.min(CANVAS_WIDTH - TOWER_SIZE/2, cx));
+          const ty = Math.max(TOWER_SIZE/2, Math.min(CANVAS_HEIGHT - TOWER_SIZE/2, cy));
+          towers.push({
+            x: tx,
+            y: ty,
+            hp: TOWER_INITIAL_HP,
+            maxHp: TOWER_INITIAL_HP,
+            damage: TOWER_DAMAGE,
+            range: TOWER_RANGE,
+            fireRate: TOWER_FIRE_RATE,
+            cooldown: 0,    // time until next shot
+            level: 1,
+            remove: false
+          });
+        }
+      });
+      /** Event: Right-click on a tower to upgrade it **/
+      canvas.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        for (let tower of towers) {
+          if (Math.abs(cx - tower.x) < TOWER_SIZE/2 && Math.abs(cy - tower.y) < TOWER_SIZE/2) {
+            // Tower found under cursor
+            const upgradeCost = BASE_UPGRADE_COST * tower.level;
+            if (gold >= upgradeCost) {
+              gold -= upgradeCost;
+              tower.level += 1;
+              tower.damage *= 1.5;
+              tower.range *= 1.2;
+              tower.maxHp += 50;
+              tower.hp = tower.maxHp;  // heal to full on upgrade
+            }
             break;
           }
         }
-      }
-      draw() {
-        ctx.drawImage(towerImg, this.x - 16, this.y - 16, 32, 32);
-        ctx.fillStyle = "darkred";
-        ctx.fillRect(this.x - 16, this.y + 20, 32, 4);
-        ctx.fillStyle = "lime";
-        ctx.fillRect(this.x - 16, this.y + 20, 32 * (this.health / this.maxHealth), 4);
-      }
-    }
-
-    class Bullet {
-      constructor(x, y, target, damage) {
-        this.x = x;
-        this.y = y;
-        this.target = target;
-        this.speed = 5;
-        this.damage = damage;
-      }
-      update() {
-        const dx = this.target.x - this.x;
-        const dy = this.target.y - this.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 10) {
-          this.target.health -= this.damage;
-          bullets.splice(bullets.indexOf(this), 1);
-          return;
+      });
+      /** Main game loop using requestAnimationFrame **/
+      let lastTime = 0;
+      function gameLoop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const dt = Math.min((timestamp - lastTime) / 1000, 0.1);  // delta time in seconds
+        lastTime = timestamp;
+        // Spawn enemies for current wave at the set interval
+        if (waveActive) {
+          spawnTimer += dt;
+          if (spawnCount < enemiesToSpawn && spawnTimer >= spawnInterval) {
+            spawnEnemy();
+            spawnCount++;
+            spawnTimer = 0;
+          }
         }
-        this.x += (dx / dist) * this.speed;
-        this.y += (dy / dist) * this.speed;
-      }
-      draw() {
-        ctx.drawImage(towerImg, this.x - 4, this.y - 4, 8, 8);
-      }
-    }
-
-    function drawGrid() {
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-      for (let x = 0; x < canvas.width; x += 80) {
-        for (let y = 0; y < canvas.height; y += 80) {
-          ctx.strokeRect(x, y, 80, 80);
+        // Update enemies: move along path or mark removal if at end
+        for (let enemy of enemies) {
+          if (enemy.remove) continue;
+          const target = path[enemy.waypointIndex];
+          const dx = target.x - enemy.x;
+          const dy = target.y - enemy.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < enemy.speed * dt) {
+            // Enemy reaches this waypoint, move exactly to it
+            enemy.x = target.x;
+            enemy.y = target.y;
+            enemy.waypointIndex += 1;
+            if (enemy.waypointIndex >= path.length) {
+              // Enemy exits the map (reached end of path)
+              enemy.remove = true;
+            }
+          } else {
+            // Move enemy towards the waypoint
+            enemy.x += (dx / distance) * enemy.speed * dt;
+            enemy.y += (dy / distance) * enemy.speed * dt;
+          }
         }
-      }
-    }
-
-    function spawnEnemy() {
-      enemies.push(new Enemy());
-    }
-
-    function updateGame() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawGrid();
-
-      const now = Date.now();
-      if (now - lastSpawn > spawnInterval) {
-        spawnEnemy();
-        lastSpawn = now;
-        if (spawnInterval > 500) spawnInterval -= 25;
-      }
-
-      for (let tower of towers) {
-        tower.update();
-        tower.draw();
-      }
-
-      for (let bullet of bullets) {
-        bullet.update();
-        bullet.draw();
-      }
-
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        const e = enemies[i];
-        e.update();
-        if (e.health <= 0) {
-          score++;
-          enemies.splice(i, 1);
-          continue;
+        // Check collisions: enemies reaching towers
+        for (let enemy of enemies) {
+          if (enemy.remove) continue;
+          for (let tower of towers) {
+            if (tower.remove) continue;
+            if (Math.abs(enemy.x - tower.x) < (ENEMY_SIZE/2 + TOWER_SIZE/2) &&
+                Math.abs(enemy.y - tower.y) < (ENEMY_SIZE/2 + TOWER_SIZE/2)) {
+              // Enemy touches a tower
+              tower.hp -= ENEMY_DAMAGE_TO_TOWER;
+              if (tower.hp <= 0) {
+                tower.remove = true;  // tower destroyed
+              }
+            }
+          }
         }
-        if (e.x > canvas.width) {
-          gameOver();
-          return;
+        // Towers attack: shoot bullets at enemies in range
+        for (let tower of towers) {
+          if (tower.remove) continue;
+          // Cooldown handling
+          if (tower.cooldown > 0) {
+            tower.cooldown -= dt;
+          }
+          if (tower.cooldown <= 0) {
+            // Find an enemy in range to shoot
+            for (let enemy of enemies) {
+              if (enemy.remove) continue;
+              const d = dist(tower.x, tower.y, enemy.x, enemy.y);
+              if (d <= tower.range) {
+                // Fire a bullet toward this enemy
+                const angle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x);
+                const bulletSpeed = 300;  // pixels per second for bullets
+                bullets.push({
+                  x: tower.x,
+                  y: tower.y,
+                  dx: Math.cos(angle) * bulletSpeed,
+                  dy: Math.sin(angle) * bulletSpeed,
+                  damage: tower.damage,
+                  target: enemy,
+                  remove: false
+                });
+                tower.cooldown = tower.fireRate;  // reset cooldown
+                break;  // shoot one target at a time
+              }
+            }
+          }
         }
-        e.draw();
-      }
-
-      requestAnimationFrame(updateGame);
-    }
-
-    function gameOver() {
-      alert("Game Over! Final Score: " + score);
-      updateLeaderboard(score);
-      score = 0;
-      wave = 1;
-      spawnInterval = 2000;
-      enemies.length = 0;
-      towers.length = 0;
-      bullets.length = 0;
-    }
-
-    function updateLeaderboard(score) {
-      const scores = JSON.parse(localStorage.getItem("scores") || "[]");
-      scores.push(score);
-      scores.sort((a, b) => b - a);
-      localStorage.setItem("scores", JSON.stringify(scores.slice(0, 5)));
-      const ol = document.getElementById("scores");
-      ol.innerHTML = scores.map(s => `<li>${s}</li>`).join("");
-    }
-
-    canvas.addEventListener("click", e => {
-      if (score >= 1) {
-        towers.push(new Tower(e.offsetX, e.offsetY));
-        score--;
-      }
-    });
-
-    canvas.addEventListener("contextmenu", e => {
-      e.preventDefault();
-      for (let tower of towers) {
-        const dx = tower.x - e.offsetX;
-        const dy = tower.y - e.offsetY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 20) {
-          tower.upgrade();
-          break;
+        // Update bullets: move and check for hits
+        for (let bullet of bullets) {
+          if (bullet.remove) continue;
+          bullet.x += bullet.dx * dt;
+          bullet.y += bullet.dy * dt;
+          // Check bullet collision with its target
+          if (bullet.target && !bullet.target.remove) {
+            const distToTarget = dist(bullet.x, bullet.y, bullet.target.x, bullet.target.y);
+            if (distToTarget < 15) {
+              // Bullet hits the target enemy
+              bullet.target.hp -= bullet.damage;
+              if (bullet.target.hp <= 0) {
+                bullet.target.remove = true;
+                score += 1;
+                gold += ENEMY_GOLD_DROP;
+              }
+              bullet.remove = true;
+            }
+          }
+          // Remove bullet if it goes off-screen
+          if (bullet.x < 0 || bullet.x > CANVAS_WIDTH || bullet.y < 0 || bullet.y > CANVAS_HEIGHT) {
+            bullet.remove = true;
+          }
         }
+        // Check end of wave: if all enemies are gone and all planned enemies spawned
+        const activeEnemies = enemies.filter(e => !e.remove);
+        if (waveActive && spawnCount >= enemiesToSpawn && activeEnemies.length === 0) {
+          waveActive = false;
+          nextWaveTime = 5;  // 5 second break until next wave
+        }
+        // Remove destroyed towers, enemies, and bullets from arrays
+        for (let i = towers.length - 1; i >= 0; i--) {
+          if (towers[i].remove) towers.splice(i, 1);
+        }
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          if (enemies[i].remove) enemies.splice(i, 1);
+        }
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          if (bullets[i].remove) bullets.splice(i, 1);
+        }
+        // If not in an active wave, update the countdown timer for next wave
+        if (!waveActive) {
+          if (nextWaveTime > 0) {
+            nextWaveTime -= dt;
+            if (nextWaveTime <= 0) {
+              startWave();  // start the next wave when timer elapses
+            }
+          }
+        }
+        // Drawing everything on canvas
+        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);  // clear previous frame
+        // Draw towers
+        for (let t of towers) {
+          ctx.drawImage(towerImg, t.x - TOWER_SIZE/2, t.y - TOWER_SIZE/2, TOWER_SIZE, TOWER_SIZE);
+          // Tower health bar (red background, green foreground)
+          const towerHealthRatio = t.hp / t.maxHp;
+          ctx.fillStyle = 'red';
+          ctx.fillRect(t.x - 20, t.y - TOWER_SIZE/2 - 10, 40, 5);
+          ctx.fillStyle = 'lime';
+          ctx.fillRect(t.x - 20, t.y - TOWER_SIZE/2 - 10, 40 * towerHealthRatio, 5);
+        }
+        // Draw enemies
+        for (let e of enemies) {
+          ctx.drawImage(enemyImg, e.x - ENEMY_SIZE/2, e.y - ENEMY_SIZE/2, ENEMY_SIZE, ENEMY_SIZE);
+          // Enemy health bar
+          const enemyHealthRatio = e.hp / e.maxHp;
+          ctx.fillStyle = 'red';
+          ctx.fillRect(e.x - 20, e.y - ENEMY_SIZE/2 - 10, 40, 5);
+          ctx.fillStyle = 'lime';
+          ctx.fillRect(e.x - 20, e.y - ENEMY_SIZE/2 - 10, 40 * enemyHealthRatio, 5);
+        }
+        // Draw bullets (small yellow squares)
+        ctx.fillStyle = 'yellow';
+        for (let b of bullets) {
+          ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+        }
+        // Update UI text values
+        scoreEl.textContent = score;
+        goldEl.textContent = gold;
+        waveEl.textContent = waveActive ? currentWave : currentWave;
+        if (!waveActive && nextWaveTime > 0) {
+          nextWaveEl.textContent = Math.ceil(nextWaveTime);
+        } else if (waveActive) {
+          nextWaveEl.textContent = '-';
+        } else {
+          nextWaveEl.textContent = '0';
+        }
+        // Loop again for next frame
+        requestAnimationFrame(gameLoop);
       }
-    });
-
-    updateLeaderboard(0);
-    spawnEnemy();
-    updateGame();
+    })();
   </script>
 </body>
 </html>
