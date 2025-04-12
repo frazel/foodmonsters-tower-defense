@@ -15,7 +15,7 @@
     canvas {
       display: block;
       margin: auto;
-      background: url('https://i.imgur.com/37r6T7A.png') no-repeat center center;
+      background: url('https://imgur.com/ARaVPJV.png') no-repeat center center;
       background-size: cover;
     }
     #leaderboard {
@@ -40,7 +40,10 @@
     const ctx = canvas.getContext("2d");
 
     const enemyImg = new Image();
-    enemyImg.src = "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExbmc0bTV0Nm50ZGNuZWZxbWEyaWl4Nmp1OHNraHphNXVtd2Iza3M2diZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/5K3c3XRHyDJAgwSWNo/giphy.gif";
+    enemyImg.src = "https://imgur.com/hNQo8cQ.png";
+
+    const towerImg = new Image();
+    towerImg.src = "https://imgur.com/wLQWu8s.png";
 
     const enemies = [];
     const towers = [];
@@ -51,7 +54,7 @@
 
     const path = [
       { x: 0, y: 300 },
-      { x: 800, y: 300 } // end point
+      { x: 800, y: 300 }
     ];
 
     class Enemy {
@@ -60,14 +63,19 @@
         this.y = path[0].y;
         this.width = 64;
         this.height = 64;
-        this.health = 20 + wave * 10;
-        this.speed = 1 + wave * 0.1;
+        this.maxHealth = 40 + wave * 20;
+        this.health = this.maxHealth;
+        this.speed = 1 + wave * 0.2;
       }
       update() {
         this.x += this.speed;
       }
       draw() {
         ctx.drawImage(enemyImg, this.x, this.y, this.width, this.height);
+        ctx.fillStyle = "red";
+        ctx.fillRect(this.x, this.y - 10, this.width, 5);
+        ctx.fillStyle = "lime";
+        ctx.fillRect(this.x, this.y - 10, this.width * (this.health / this.maxHealth), 5);
       }
     }
 
@@ -78,6 +86,15 @@
         this.range = 100;
         this.damage = 10;
         this.cooldown = 0;
+        this.health = 100;
+      }
+      upgrade() {
+        if (money >= 100) {
+          this.damage += 5;
+          this.range += 10;
+          this.health += 20;
+          money -= 100;
+        }
       }
       update() {
         if (this.cooldown > 0) this.cooldown--;
@@ -93,8 +110,7 @@
         }
       }
       draw() {
-        ctx.fillStyle = "lime";
-        ctx.fillRect(this.x - 10, this.y - 10, 20, 20);
+        ctx.drawImage(towerImg, this.x - 16, this.y - 16, 32, 32);
       }
     }
 
@@ -118,10 +134,7 @@
         this.y += (dy / dist) * this.speed;
       }
       draw() {
-        ctx.fillStyle = "yellow";
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.drawImage(towerImg, this.x - 4, this.y - 4, 8, 8);
       }
     }
 
@@ -196,8 +209,14 @@
 
     canvas.addEventListener("click", e => {
       if (money >= 50) {
-        towers.push(new Tower(e.offsetX, e.offsetY));
+        const tower = new Tower(e.offsetX, e.offsetY);
+        towers.push(tower);
         money -= 50;
+
+        canvas.addEventListener("contextmenu", event => {
+          event.preventDefault();
+          tower.upgrade();
+        });
       }
     });
 
@@ -212,4 +231,5 @@
   </script>
 </body>
 </html>
+
 
