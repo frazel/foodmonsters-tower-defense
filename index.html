@@ -73,15 +73,9 @@
       // Load tower and enemy images
       const towerImg = new Image();
       const enemyImg = new Image();
-      const bulletImg = new Image();
-
       towerImg.src = "https://imgur.com/wLQWu8s.png";
       enemyImg.src = "https://imgur.com/hNQo8cQ.png";
-      bulletImg.src = "https://imgur.com/i3Vd9Uv.png";
-
       let assetsLoaded = 0;
-
-
       // Start game loop when images are loaded
       towerImg.onload = enemyImg.onload = () => {
         assetsLoaded++;
@@ -332,12 +326,10 @@
           ctx.fillRect(e.x - 20, e.y - ENEMY_SIZE/2 - 10, 40 * enemyHealthRatio, 5);
         }
         // Draw bullets (small yellow squares)
-        ctx.save();
-        ctx.translate(b.x, b.y);
-        ctx.rotate(Math.atan2(b.dy, b.dx));
-        ctx.drawImage(bulletImg, -4, -4, 8, 8); // Tiny burger
-        ctx.restore();
-
+        ctx.fillStyle = 'yellow';
+        for (let b of bullets) {
+          ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+        }
         // Update UI text values
         scoreEl.textContent = score;
         goldEl.textContent = gold;
@@ -356,6 +348,9 @@
   </script>
 </body>
 </html>
+
+
+
 
 
 
