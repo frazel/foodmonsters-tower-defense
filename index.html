@@ -19,17 +19,42 @@
       text-align: left; border-radius: 5px;
     }
     #ui small { font-size: 11px; color: #ccc; }
+    #startScreen {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8); color: #fff; padding: 20px; border-radius: 10px;
+      text-align: center; font-family: sans-serif;
+    }
+    #startScreen input { margin: 10px; padding: 5px; }
+    #startScreen button { padding: 5px 10px; cursor: pointer; }
+    #tryAgainButton {
+      position: fixed; top: 60%; left: 50%; transform: translate(-50%, -50%);
+      padding: 10px 20px; font-size: 16px; cursor: pointer;
+      background: #fff; color: #000; border: none; border-radius: 5px;
+    }
+    #leaderboard { margin-top: 10px; font-size: 12px; }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas" width="800" height="500"></canvas>
   <div id="ui">
+    Player: <span id="playerName">Unknown</span><br>
     Score: <span id="score">0</span><br>
     Gold: <span id="gold">0</span><br>
     Wave: <span id="wave">0</span><br>
     Next wave in: <span id="nextWave">0</span>s<br>
     Lives: <span id="lives">10</span> <span id="hearts">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</span><br>
     <small>Left-click to place tower, Right-click a tower to upgrade</small>
+    <div id="leaderboard">
+      <b>Top 5 Scores:</b><br>
+      <span id="highScores">No scores yet</span>
+    </div>
+  </div>
+  <div id="startScreen">
+    <h2>Tower Defense</h2>
+    <p>Enter your Discord name:</p>
+    <input type="text" id="discordName" placeholder="Discord#1234" maxlength="32" />
+    <br>
+    <button onclick="startGame()">Start Game</button>
   </div>
   <script>
     // Immediately Invoked Function to avoid globals
@@ -38,8 +63,8 @@
       const CANVAS_WIDTH = 800, CANVAS_HEIGHT = 500;
       const TOWER_SIZE = 40, ENEMY_SIZE = 40;
       const TOWER_COST = 50, BASE_UPGRADE_COST = 50;
-      const ENEMY_BASE_HP = 50, ENEMY_HP_INCREMENT = 10;
-      const ENEMY_BASE_SPEED = 50, ENEMY_SPEED_INCREMENT = 5;
+      const ENEMY_BASE_HP = 50, ENEMY_HP_INCREMENT = 9; // In-between (was 8, orig 10)
+      const ENEMY_BASE_SPEED = 50, ENEMY_SPEED_INCREMENT = 4; // In-between (was 3, orig 5)
       const ENEMY_GOLD_DROP = 20;
       const TOWER_DAMAGE = 20, TOWER_RANGE = 100, TOWER_FIRE_RATE = 1.0;
       const TOWER_INITIAL_HP = 100, ENEMY_DAMAGE_TO_TOWER = 50;
@@ -58,6 +83,8 @@
       let lives = MAX_LIVES;
       let gameOver = false;
       let gameWon = false;
+      let gameStarted = false;
+      let playerName = "Unknown";
 
       // Popup for life loss
       const popups = [];
@@ -84,6 +111,13 @@
       const nextWaveEl = document.getElementById('nextWave');
       const livesEl = document.getElementById('lives');
       const heartsEl = document.getElementById('hearts');
+      const playerNameEl = document.getElementById('playerName');
+      const startScreen = document.getElementById('startScreen');
+      const highScoresEl = document.getElementById('highScores');
+
+      // Load high scores from localStorage
+      let highScores = JSON.parse(localStorage.getItem('highScores')) || [];
+      updateLeaderboard();
 
       // Load tower and enemy images with fallback
       const towerImg = new Image();
@@ -97,8 +131,7 @@
       function handleAssetLoad() {
         assetsLoaded++;
         if (assetsLoaded === 2 || imagesFailed) {
-          console.log('Starting game loop. Assets loaded:', assetsLoaded);
-          requestAnimationFrame(gameLoop);
+          console.log('Assets loaded:', assetsLoaded);
         }
       }
 
@@ -106,10 +139,6 @@
         console.error(`Failed to load image: ${img.src}`);
         imagesFailed = true;
         assetsLoaded++;
-        if (assetsLoaded === 2) {
-          console.log('Starting game loop with fallback graphics');
-          requestAnimationFrame(gameLoop);
-        }
       }
 
       towerImg.onload = handleAssetLoad;
@@ -119,6 +148,68 @@
 
       // Disable context menu on right-click
       canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+      /** Start game after Discord name input **/
+      function startGame() {
+        const discordInput = document.getElementById('discordName').value.trim();
+        if (discordInput) {
+          playerName = discordInput;
+          playerNameEl.textContent = playerName;
+          startScreen.style.display = 'none';
+          gameStarted = true;
+          console.log('Starting game loop with player:', playerName);
+          requestAnimationFrame(gameLoop);
+        } else {
+          alert('Please enter a Discord name!');
+        }
+      }
+
+      /** Reset game state for Try Again **/
+      function resetGame() {
+        score = 0;
+        gold = 100;
+        currentWave = 0;
+        waveActive = false;
+        nextWaveTime = 3;
+        enemiesToSpawn = 0;
+        spawnCount = 0;
+        spawnTimer = 0;
+        lives = MAX_LIVES;
+        gameOver = false;
+        gameWon = false;
+        gameStarted = false;
+        towers.length = 0;
+        enemies.length = 0;
+        bullets.length = 0;
+        popups.length = 0;
+        playerName = "Unknown";
+        playerNameEl.textContent = playerName;
+        startScreen.style.display = 'block';
+        if (document.getElementById('tryAgainButton')) {
+          document.getElementById('tryAgainButton').remove();
+        }
+        updateUI();
+      }
+
+      /** Save high score **/
+      function saveHighScore() {
+        highScores.push({ name: playerName, score: score });
+        highScores.sort((a, b) => b.score - a.score);
+        highScores = highScores.slice(0, 5); // Keep top 5
+        localStorage.setItem('highScores', JSON.stringify(highScores));
+        updateLeaderboard();
+      }
+
+      /** Update leaderboard display **/
+      function updateLeaderboard() {
+        if (highScores.length === 0) {
+          highScoresEl.textContent = 'No scores yet';
+        } else {
+          highScoresEl.innerHTML = highScores
+            .map((entry, i) => `${i + 1}. ${entry.name}: ${entry.score}`)
+            .join('<br>');
+        }
+      }
 
       /** Helper function: distance between two points **/
       function dist(ax, ay, bx, by) {
@@ -152,7 +243,7 @@
 
       /** Event: Left-click to place a new tower **/
       canvas.addEventListener('click', e => {
-        if (gameOver || gameWon) return;
+        if (!gameStarted || gameOver || gameWon) return;
         const rect = canvas.getBoundingClientRect();
         const cx = e.clientX - rect.left;
         const cy = e.clientY - rect.top;
@@ -188,7 +279,7 @@
       /** Event: Right-click on a tower to upgrade it **/
       canvas.addEventListener('contextmenu', e => {
         e.preventDefault();
-        if (gameOver || gameWon) return;
+        if (!gameStarted || gameOver || gameWon) return;
         const rect = canvas.getBoundingClientRect();
         const cx = e.clientX - rect.left;
         const cy = e.clientY - rect.top;
@@ -214,6 +305,7 @@
       /** Main game loop using requestAnimationFrame **/
       let lastTime = 0;
       function gameLoop(timestamp) {
+        if (!gameStarted) return;
         if (!lastTime) lastTime = timestamp;
         const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
         lastTime = timestamp;
@@ -222,6 +314,7 @@
           ctx.fillStyle = 'red';
           ctx.font = '48px sans-serif';
           ctx.fillText('Game Over', CANVAS_WIDTH / 2 - 100, CANVAS_HEIGHT / 2);
+          showTryAgainButton();
           return;
         }
 
@@ -229,6 +322,7 @@
           ctx.fillStyle = 'green';
           ctx.font = '48px sans-serif';
           ctx.fillText(`GG! Final Score: ${score}`, CANVAS_WIDTH / 2 - 150, CANVAS_HEIGHT / 2);
+          showTryAgainButton();
           return;
         }
 
@@ -260,11 +354,12 @@
                 y: CANVAS_HEIGHT / 2,
                 text: '-1 Life',
                 alpha: 1,
-                time: 1.5 // seconds
+                time: 1.5
               });
               enemy.remove = true;
               if (lives <= 0) {
                 gameOver = true;
+                saveHighScore();
               }
             }
           } else {
@@ -355,6 +450,7 @@
           waveActive = false;
           if (currentWave === 50) {
             gameWon = true;
+            saveHighScore();
           } else {
             nextWaveTime = 5;
           }
@@ -383,6 +479,16 @@
 
         // Drawing everything on canvas
         ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+        // Draw path outline
+        ctx.beginPath();
+        ctx.moveTo(path[0].x, path[0].y);
+        for (let i = 1; i < path.length; i++) {
+          ctx.lineTo(path[i].x, path[i].y);
+        }
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 10;
+        ctx.stroke();
 
         // Draw towers with size scaling and level 5 glow
         for (let t of towers) {
@@ -436,21 +542,35 @@
         }
 
         // Update UI text values
-        scoreEl.textContent = score;
-        goldEl.textContent = gold;
-        waveEl.textContent = waveActive ? currentWave : currentWave;
-        livesEl.textContent = lives;
-        heartsEl.textContent = '❤️'.repeat(lives);
-        if (!waveActive && nextWaveTime > 0) {
-          nextWaveEl.textContent = Math.ceil(nextWaveTime);
-        } else if (waveActive) {
-          nextWaveEl.textContent = '-';
-        } else {
-          nextWaveEl.textContent = '0';
+        function updateUI() {
+          scoreEl.textContent = score;
+          goldEl.textContent = gold;
+          waveEl.textContent = waveActive ? currentWave : currentWave;
+          livesEl.textContent = lives;
+          heartsEl.textContent = '❤️'.repeat(lives);
+          if (!waveActive && nextWaveTime > 0) {
+            nextWaveEl.textContent = Math.ceil(nextWaveTime);
+          } else if (waveActive) {
+            nextWaveEl.textContent = '-';
+          } else {
+            nextWaveEl.textContent = '0';
+          }
         }
+        updateUI();
 
         // Loop again for next frame
         requestAnimationFrame(gameLoop);
+      }
+
+      /** Show Try Again button **/
+      function showTryAgainButton() {
+        if (!document.getElementById('tryAgainButton')) {
+          const button = document.createElement('button');
+          button.id = 'tryAgainButton';
+          button.textContent = 'Try Again';
+          button.onclick = resetGame;
+          document.body.appendChild(button);
+        }
       }
     })();
   </script>
