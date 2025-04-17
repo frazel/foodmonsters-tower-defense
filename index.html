@@ -57,103 +57,99 @@
     <button onclick="startGame()">Start Game</button>
   </div>
   <script>
-    // Immediately Invoked Function to avoid globals
-    (() => {
-      /** Game Constants and Initial Settings **/
-      const CANVAS_WIDTH = 800, CANVAS_HEIGHT = 500;
-      const TOWER_SIZE = 40, ENEMY_SIZE = 40;
-      const TOWER_COST = 50, BASE_UPGRADE_COST = 50;
-      const ENEMY_BASE_HP = 50, ENEMY_HP_INCREMENT = 9; // In-between (was 8, orig 10)
-      const ENEMY_BASE_SPEED = 50, ENEMY_SPEED_INCREMENT = 4; // In-between (was 3, orig 5)
-      const ENEMY_GOLD_DROP = 20;
-      const TOWER_DAMAGE = 20, TOWER_RANGE = 100, TOWER_FIRE_RATE = 1.0;
-      const TOWER_INITIAL_HP = 100, ENEMY_DAMAGE_TO_TOWER = 50;
-      const MAX_LIVES = 10;
+    // Game Constants and Initial Settings
+    const CANVAS_WIDTH = 800, CANVAS_HEIGHT = 500;
+    const TOWER_SIZE = 40, ENEMY_SIZE = 40;
+    const TOWER_COST = 50, BASE_UPGRADE_COST = 50;
+    const ENEMY_BASE_HP = 50, ENEMY_HP_INCREMENT = 9;
+    const ENEMY_BASE_SPEED = 50, ENEMY_SPEED_INCREMENT = 4;
+    const ENEMY_GOLD_DROP = 20;
+    const TOWER_DAMAGE = 20, TOWER_RANGE = 100, TOWER_FIRE_RATE = 1.0;
+    const TOWER_INITIAL_HP = 100, ENEMY_DAMAGE_TO_TOWER = 50;
+    const MAX_LIVES = 10;
 
-      // Game State Variables
-      let score = 0;
-      let gold = 100;
-      let currentWave = 0;
-      let waveActive = false;
-      let nextWaveTime = 3;
-      let enemiesToSpawn = 0;
-      let spawnCount = 0;
-      const spawnInterval = 0.5;
-      let spawnTimer = 0;
-      let lives = MAX_LIVES;
-      let gameOver = false;
-      let gameWon = false;
-      let gameStarted = false;
-      let playerName = "Unknown";
+    // Game State Variables
+    let score = 0;
+    let gold = 100;
+    let currentWave = 0;
+    let waveActive = false;
+    let nextWaveTime = 3;
+    let enemiesToSpawn = 0;
+    let spawnCount = 0;
+    const spawnInterval = 0.5;
+    let spawnTimer = 0;
+    let lives = MAX_LIVES;
+    let gameOver = false;
+    let gameWon = false;
+    let gameStarted = false;
+    let playerName = "Unknown";
 
-      // Popup for life loss
-      const popups = [];
+    // Popup for life loss
+    const popups = [];
 
-      // Game Object Arrays
-      const towers = [];
-      const enemies = [];
-      const bullets = [];
+    // Game Object Arrays
+    const towers = [];
+    const enemies = [];
+    const bullets = [];
 
-      // Path waypoints for enemies
-      const path = [
-        { x: 0, y: 250 },
-        { x: 400, y: 250 },
-        { x: 400, y: 400 },
-        { x: 800, y: 400 }
-      ];
+    // Path waypoints for enemies
+    const path = [
+      { x: 0, y: 250 },
+      { x: 400, y: 250 },
+      { x: 400, y: 400 },
+      { x: 800, y: 400 }
+    ];
 
-      // Canvas and UI element references
-      const canvas = document.getElementById('gameCanvas');
-      const ctx = canvas.getContext('2d');
-      const scoreEl = document.getElementById('score');
-      const goldEl = document.getElementById('gold');
-      const waveEl = document.getElementById('wave');
-      const nextWaveEl = document.getElementById('nextWave');
-      const livesEl = document.getElementById('lives');
-      const heartsEl = document.getElementById('hearts');
-      const playerNameEl = document.getElementById('playerName');
-      const startScreen = document.getElementById('startScreen');
-      const highScoresEl = document.getElementById('highScores');
+    // Canvas and UI element references
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const goldEl = document.getElementById('gold');
+    const waveEl = document.getElementById('wave');
+    const nextWaveEl = document.getElementById('nextWave');
+    const livesEl = document.getElementById('lives');
+    const heartsEl = document.getElementById('hearts');
+    const playerNameEl = document.getElementById('playerName');
+    const startScreen = document.getElementById('startScreen');
+    const highScoresEl = document.getElementById('highScores');
 
-      // Load high scores from localStorage
-      let highScores = JSON.parse(localStorage.getItem('highScores')) || [];
-      updateLeaderboard();
+    // Load high scores from localStorage
+    let highScores = JSON.parse(localStorage.getItem('highScores')) || [];
+    updateLeaderboard();
 
-      // Load tower and enemy images with fallback
-      const towerImg = new Image();
-      const enemyImg = new Image();
-      towerImg.src = "https://imgur.com/wLQWu8s.png";
-      enemyImg.src = "https://imgur.com/hNQo8cQ.png";
-      let assetsLoaded = 0;
-      let imagesFailed = false;
+    // Load tower and enemy images with fallback
+    const towerImg = new Image();
+    const enemyImg = new Image();
+    towerImg.src = "https://imgur.com/wLQWu8s.png";
+    enemyImg.src = "https://imgur.com/hNQo8cQ.png";
+    let assetsLoaded = 0;
+    let imagesFailed = false;
 
-      // Image load/error handlers
-      function handleAssetLoad() {
-        assetsLoaded++;
-        if (assetsLoaded === 2 || imagesFailed) {
-          console.log('Assets loaded:', assetsLoaded);
-        }
-      }
+    // Image load/error handlers
+    function handleAssetLoad() {
+      assetsLoaded++;
+      console.log('Assets loaded:', assetsLoaded);
+    }
 
-      function handleAssetError(img) {
-        console.error(`Failed to load image: ${img.src}`);
-        imagesFailed = true;
-        assetsLoaded++;
-      }
+    function handleAssetError(img) {
+      console.error(`Failed to load image: ${img.src}`);
+      imagesFailed = true;
+      assetsLoaded++;
+    }
 
-      towerImg.onload = handleAssetLoad;
-      enemyImg.onload = handleAssetLoad;
-      towerImg.onerror = () => handleAssetError(towerImg);
-      enemyImg.onerror = () => handleAssetError(enemyImg);
+    towerImg.onload = handleAssetLoad;
+    enemyImg.onload = handleAssetLoad;
+    towerImg.onerror = () => handleAssetError(towerImg);
+    enemyImg.onerror = () => handleAssetError(enemyImg);
 
-      // Disable context menu on right-click
-      canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-      /** Start game after Discord name input **/
-      function startGame() {
-        const discordInput = document.getElementById('discordName').value.trim();
-        if (discordInput) {
-          playerName = discordInput;
+    // Start game after Discord name input
+    function startGame() {
+      try {
+        const discordInput = document.getElementById('discordName');
+        if (!discordInput) throw new Error('Discord name input not found');
+        const name = discordInput.value.trim();
+        if (name) {
+          playerName = name;
           playerNameEl.textContent = playerName;
           startScreen.style.display = 'none';
           gameStarted = true;
@@ -162,416 +158,424 @@
         } else {
           alert('Please enter a Discord name!');
         }
+      } catch (error) {
+        console.error('Error in startGame:', error);
       }
+    }
 
-      /** Reset game state for Try Again **/
-      function resetGame() {
-        score = 0;
-        gold = 100;
-        currentWave = 0;
-        waveActive = false;
-        nextWaveTime = 3;
-        enemiesToSpawn = 0;
-        spawnCount = 0;
-        spawnTimer = 0;
-        lives = MAX_LIVES;
-        gameOver = false;
-        gameWon = false;
-        gameStarted = false;
-        towers.length = 0;
-        enemies.length = 0;
-        bullets.length = 0;
-        popups.length = 0;
-        playerName = "Unknown";
-        playerNameEl.textContent = playerName;
-        startScreen.style.display = 'block';
-        if (document.getElementById('tryAgainButton')) {
-          document.getElementById('tryAgainButton').remove();
+    // Reset game state for Try Again
+    function resetGame() {
+      score = 0;
+      gold = 100;
+      currentWave = 0;
+      waveActive = false;
+      nextWaveTime = 3;
+      enemiesToSpawn = 0;
+      spawnCount = 0;
+      spawnTimer = 0;
+      lives = MAX_LIVES;
+      gameOver = false;
+      gameWon = false;
+      gameStarted = false;
+      towers.length = 0;
+      enemies.length = 0;
+      bullets.length = 0;
+      popups.length = 0;
+      playerName = "Unknown";
+      playerNameEl.textContent = playerName;
+      startScreen.style.display = 'block';
+      if (document.getElementById('tryAgainButton')) {
+        document.getElementById('tryAgainButton').remove();
+      }
+      updateUI();
+    }
+
+    // Save high score
+    function saveHighScore() {
+      highScores.push({ name: playerName, score: score });
+      highScores.sort((a, b) => b.score - a.score);
+      highScores = highScores.slice(0, 5); // Keep top 5
+      localStorage.setItem('highScores', JSON.stringify(highScores));
+      updateLeaderboard();
+    }
+
+    // Update leaderboard display
+    function updateLeaderboard() {
+      if (highScores.length === 0) {
+        highScoresEl.textContent = 'No scores yet';
+      } else {
+        highScoresEl.innerHTML = highScores
+          .map((entry, i) => `${i + 1}. ${entry.name}: ${entry.score}`)
+          .join('<br>');
+      }
+    }
+
+    // Helper function: distance between two points
+    function dist(ax, ay, bx, by) {
+      return Math.hypot(bx - ax, by - ay);
+    }
+
+    // Spawn a new enemy at the start of the path
+    function spawnEnemy() {
+      const hp = ENEMY_BASE_HP + (currentWave - 1) * ENEMY_HP_INCREMENT;
+      const speed = ENEMY_BASE_SPEED + (currentWave - 1) * ENEMY_SPEED_INCREMENT;
+      const spawnX = path[0].x, spawnY = path[0].y;
+      enemies.push({
+        x: spawnX,
+        y: spawnY,
+        hp: hp,
+        maxHp: hp,
+        speed: speed,
+        waypointIndex: 1,
+        remove: false
+      });
+    }
+
+    // Start the next wave of enemies
+    function startWave() {
+      waveActive = true;
+      currentWave += 1;
+      spawnCount = 0;
+      enemiesToSpawn = currentWave * 3 + 1;
+      spawnTimer = 0;
+    }
+
+    // Event: Left-click to place a new tower
+    canvas.addEventListener('click', e => {
+      if (!gameStarted || gameOver || gameWon) return;
+      const rect = canvas.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      for (let tower of towers) {
+        if (Math.abs(cx - tower.x) < TOWER_SIZE/2 && Math.abs(cy - tower.y) < TOWER_SIZE/2) {
+          return;
         }
-        updateUI();
       }
-
-      /** Save high score **/
-      function saveHighScore() {
-        highScores.push({ name: playerName, score: score });
-        highScores.sort((a, b) => b.score - a.score);
-        highScores = highScores.slice(0, 5); // Keep top 5
-        localStorage.setItem('highScores', JSON.stringify(highScores));
-        updateLeaderboard();
-      }
-
-      /** Update leaderboard display **/
-      function updateLeaderboard() {
-        if (highScores.length === 0) {
-          highScoresEl.textContent = 'No scores yet';
-        } else {
-          highScoresEl.innerHTML = highScores
-            .map((entry, i) => `${i + 1}. ${entry.name}: ${entry.score}`)
-            .join('<br>');
-        }
-      }
-
-      /** Helper function: distance between two points **/
-      function dist(ax, ay, bx, by) {
-        return Math.hypot(bx - ax, by - ay);
-      }
-
-      /** Spawn a new enemy at the start of the path **/
-      function spawnEnemy() {
-        const hp = ENEMY_BASE_HP + (currentWave - 1) * ENEMY_HP_INCREMENT;
-        const speed = ENEMY_BASE_SPEED + (currentWave - 1) * ENEMY_SPEED_INCREMENT;
-        const spawnX = path[0].x, spawnY = path[0].y;
-        enemies.push({
-          x: spawnX,
-          y: spawnY,
-          hp: hp,
-          maxHp: hp,
-          speed: speed,
-          waypointIndex: 1,
-          remove: false
-        });
-      }
-
-      /** Start the next wave of enemies **/
-      function startWave() {
-        waveActive = true;
-        currentWave += 1;
-        spawnCount = 0;
-        enemiesToSpawn = currentWave * 3 + 1;
-        spawnTimer = 0;
-      }
-
-      /** Event: Left-click to place a new tower **/
-      canvas.addEventListener('click', e => {
-        if (!gameStarted || gameOver || gameWon) return;
-        const rect = canvas.getBoundingClientRect();
-        const cx = e.clientX - rect.left;
-        const cy = e.clientY - rect.top;
+      if (gold >= TOWER_COST) {
         for (let tower of towers) {
-          if (Math.abs(cx - tower.x) < TOWER_SIZE/2 && Math.abs(cy - tower.y) < TOWER_SIZE/2) {
+          if (dist(cx, cy, tower.x, tower.y) < TOWER_SIZE) {
             return;
           }
         }
-        if (gold >= TOWER_COST) {
-          for (let tower of towers) {
-            if (dist(cx, cy, tower.x, tower.y) < TOWER_SIZE) {
-              return;
+        gold -= TOWER_COST;
+        const tx = Math.max(TOWER_SIZE/2, Math.min(CANVAS_WIDTH - TOWER_SIZE/2, cx));
+        const ty = Math.max(TOWER_SIZE/2, Math.min(CANVAS_HEIGHT - TOWER_SIZE/2, cy));
+        towers.push({
+          x: tx,
+          y: ty,
+          hp: TOWER_INITIAL_HP,
+          maxHp: TOWER_INITIAL_HP,
+          damage: TOWER_DAMAGE,
+          range: TOWER_RANGE,
+          fireRate: TOWER_FIRE_RATE,
+          cooldown: 0,
+          level: 1,
+          remove: false
+        });
+      }
+    });
+
+    // Event: Right-click on a tower to upgrade it
+    canvas.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (!gameStarted || gameOver || gameWon) return;
+      const rect = canvas.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      for (let tower of towers) {
+        if (Math.abs(cx - tower.x) < TOWER_SIZE/2 && Math.abs(cy - tower.y) < TOWER_SIZE/2) {
+          const upgradeCost = BASE_UPGRADE_COST * tower.level;
+          if (gold >= upgradeCost) {
+            gold -= upgradeCost;
+            tower.level += 1;
+            tower.damage *= 1.5;
+            tower.range *= 1.2;
+            tower.maxHp += 50;
+            tower.hp = tower.maxHp;
+            if (tower.level === 5) {
+              tower.fireRate = TOWER_FIRE_RATE / 2; // Shoot twice as fast
             }
           }
-          gold -= TOWER_COST;
-          const tx = Math.max(TOWER_SIZE/2, Math.min(CANVAS_WIDTH - TOWER_SIZE/2, cx));
-          const ty = Math.max(TOWER_SIZE/2, Math.min(CANVAS_HEIGHT - TOWER_SIZE/2, cy));
-          towers.push({
-            x: tx,
-            y: ty,
-            hp: TOWER_INITIAL_HP,
-            maxHp: TOWER_INITIAL_HP,
-            damage: TOWER_DAMAGE,
-            range: TOWER_RANGE,
-            fireRate: TOWER_FIRE_RATE,
-            cooldown: 0,
-            level: 1,
-            remove: false
-          });
+          break;
         }
-      });
+      }
+    });
 
-      /** Event: Right-click on a tower to upgrade it **/
-      canvas.addEventListener('contextmenu', e => {
-        e.preventDefault();
-        if (!gameStarted || gameOver || gameWon) return;
-        const rect = canvas.getBoundingClientRect();
-        const cx = e.clientX - rect.left;
-        const cy = e.clientY - rect.top;
-        for (let tower of towers) {
-          if (Math.abs(cx - tower.x) < TOWER_SIZE/2 && Math.abs(cy - tower.y) < TOWER_SIZE/2) {
-            const upgradeCost = BASE_UPGRADE_COST * tower.level;
-            if (gold >= upgradeCost) {
-              gold -= upgradeCost;
-              tower.level += 1;
-              tower.damage *= 1.5;
-              tower.range *= 1.2;
-              tower.maxHp += 50;
-              tower.hp = tower.maxHp;
-              if (tower.level === 5) {
-                tower.fireRate = TOWER_FIRE_RATE / 2; // Shoot twice as fast
-              }
-            }
-            break;
-          }
+    // Main game loop using requestAnimationFrame
+    let lastTime = 0;
+    function gameLoop(timestamp) {
+      if (!gameStarted) return;
+      if (!lastTime) lastTime = timestamp;
+      const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+      lastTime = timestamp;
+
+      if (gameOver) {
+        ctx.fillStyle = 'red';
+        ctx.font = '48px sans-serif';
+        ctx.fillText('Game Over', CANVAS_WIDTH / 2 - 100, CANVAS_HEIGHT / 2);
+        showTryAgainButton();
+        return;
+      }
+
+      if (gameWon) {
+        ctx.fillStyle = 'green';
+        ctx.font = '48px sans-serif';
+        ctx.fillText(`GG! Final Score: ${score}`, CANVAS_WIDTH / 2 - 150, CANVAS_HEIGHT / 2);
+        showTryAgainButton();
+        return;
+      }
+
+      // Spawn enemies for current wave
+      if (waveActive) {
+        spawnTimer += dt;
+        if (spawnCount < enemiesToSpawn && spawnTimer >= spawnInterval) {
+          spawnEnemy();
+          spawnCount++;
+          spawnTimer = 0;
         }
-      });
+      }
 
-      /** Main game loop using requestAnimationFrame **/
-      let lastTime = 0;
-      function gameLoop(timestamp) {
-        if (!gameStarted) return;
-        if (!lastTime) lastTime = timestamp;
-        const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
-        lastTime = timestamp;
-
-        if (gameOver) {
-          ctx.fillStyle = 'red';
-          ctx.font = '48px sans-serif';
-          ctx.fillText('Game Over', CANVAS_WIDTH / 2 - 100, CANVAS_HEIGHT / 2);
-          showTryAgainButton();
-          return;
-        }
-
-        if (gameWon) {
-          ctx.fillStyle = 'green';
-          ctx.font = '48px sans-serif';
-          ctx.fillText(`GG! Final Score: ${score}`, CANVAS_WIDTH / 2 - 150, CANVAS_HEIGHT / 2);
-          showTryAgainButton();
-          return;
-        }
-
-        // Spawn enemies for current wave
-        if (waveActive) {
-          spawnTimer += dt;
-          if (spawnCount < enemiesToSpawn && spawnTimer >= spawnInterval) {
-            spawnEnemy();
-            spawnCount++;
-            spawnTimer = 0;
-          }
-        }
-
-        // Update enemies
-        for (let enemy of enemies) {
-          if (enemy.remove) continue;
-          const target = path[enemy.waypointIndex];
-          const dx = target.x - enemy.x;
-          const dy = target.y - enemy.y;
-          const distance = Math.hypot(dx, dy);
-          if (distance < enemy.speed * dt) {
-            enemy.x = target.x;
-            enemy.y = target.y;
-            enemy.waypointIndex += 1;
-            if (enemy.waypointIndex >= path.length) {
-              lives -= 1;
-              popups.push({
-                x: CANVAS_WIDTH - 50,
-                y: CANVAS_HEIGHT / 2,
-                text: '-1 Life',
-                alpha: 1,
-                time: 1.5
-              });
-              enemy.remove = true;
-              if (lives <= 0) {
-                gameOver = true;
-                saveHighScore();
-              }
-            }
-          } else {
-            enemy.x += (dx / distance) * enemy.speed * dt;
-            enemy.y += (dy / distance) * enemy.speed * dt;
-          }
-        }
-
-        // Check collisions: enemies reaching towers
-        for (let enemy of enemies) {
-          if (enemy.remove) continue;
-          for (let tower of towers) {
-            if (tower.remove) continue;
-            if (Math.abs(enemy.x - tower.x) < (ENEMY_SIZE/2 + TOWER_SIZE/2) &&
-                Math.abs(enemy.y - tower.y) < (ENEMY_SIZE/2 + TOWER_SIZE/2)) {
-              tower.hp -= ENEMY_DAMAGE_TO_TOWER;
-              if (tower.hp <= 0) {
-                tower.remove = true;
-              }
+      // Update enemies
+      for (let enemy of enemies) {
+        if (enemy.remove) continue;
+        const target = path[enemy.waypointIndex];
+        const dx = target.x - enemy.x;
+        const dy = target.y - enemy.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < enemy.speed * dt) {
+          enemy.x = target.x;
+          enemy.y = target.y;
+          enemy.waypointIndex += 1;
+          if (enemy.waypointIndex >= path.length) {
+            lives -= 1;
+            popups.push({
+              x: CANVAS_WIDTH - 50,
+              y: CANVAS_HEIGHT / 2,
+              text: '-1 Life',
+              alpha: 1,
+              time: 1.5
+            });
+            enemy.remove = true;
+            if (lives <= 0) {
+              gameOver = true;
+              saveHighScore();
             }
           }
+        } else {
+          enemy.x += (dx / distance) * enemy.speed * dt;
+          enemy.y += (dy / distance) * enemy.speed * dt;
         }
+      }
 
-        // Towers attack
+      // Check collisions: enemies reaching towers
+      for (let enemy of enemies) {
+        if (enemy.remove) continue;
         for (let tower of towers) {
           if (tower.remove) continue;
-          if (tower.cooldown > 0) {
-            tower.cooldown -= dt;
-          }
-          if (tower.cooldown <= 0) {
-            for (let enemy of enemies) {
-              if (enemy.remove) continue;
-              const d = dist(tower.x, tower.y, enemy.x, enemy.y);
-              if (d <= tower.range) {
-                const angle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x);
-                const bulletSpeed = 300;
-                bullets.push({
-                  x: tower.x,
-                  y: tower.y,
-                  dx: Math.cos(angle) * bulletSpeed,
-                  dy: Math.sin(angle) * bulletSpeed,
-                  damage: tower.damage,
-                  target: enemy,
-                  remove: false
-                });
-                tower.cooldown = tower.fireRate;
-                break;
-              }
+          if (Math.abs(enemy.x - tower.x) < (ENEMY_SIZE/2 + TOWER_SIZE/2) &&
+              Math.abs(enemy.y - tower.y) < (ENEMY_SIZE/2 + TOWER_SIZE/2)) {
+            tower.hp -= ENEMY_DAMAGE_TO_TOWER;
+            if (tower.hp <= 0) {
+              tower.remove = true;
             }
           }
         }
+      }
 
-        // Update bullets
-        for (let bullet of bullets) {
-          if (bullet.remove) continue;
-          bullet.x += bullet.dx * dt;
-          bullet.y += bullet.dy * dt;
-          if (bullet.target && !bullet.target.remove) {
-            const distToTarget = dist(bullet.x, bullet.y, bullet.target.x, bullet.target.y);
-            if (distToTarget < 15) {
-              bullet.target.hp -= bullet.damage;
-              if (bullet.target.hp <= 0) {
-                bullet.target.remove = true;
-                score += 1;
-                gold += ENEMY_GOLD_DROP;
-              }
-              bullet.remove = true;
+      // Towers attack
+      for (let tower of towers) {
+        if (tower.remove) continue;
+        if (tower.cooldown > 0) {
+          tower.cooldown -= dt;
+        }
+        if (tower.cooldown <= 0) {
+          for (let enemy of enemies) {
+            if (enemy.remove) continue;
+            const d = dist(tower.x, tower.y, enemy.x, enemy.y);
+            if (d <= tower.range) {
+              const angle = Math.atan2(enemy.y - tower.y, enemy.x - tower.x);
+              const bulletSpeed = 300;
+              bullets.push({
+                x: tower.x,
+                y: tower.y,
+                dx: Math.cos(angle) * bulletSpeed,
+                dy: Math.sin(angle) * bulletSpeed,
+                damage: tower.damage,
+                target: enemy,
+                remove: false
+              });
+              tower.cooldown = tower.fireRate;
+              break;
             }
           }
-          if (bullet.x < 0 || bullet.x > CANVAS_WIDTH || bullet.y < 0 || bullet.y > CANVAS_HEIGHT) {
+        }
+      }
+
+      // Update bullets
+      for (let bullet of bullets) {
+        if (bullet.remove) continue;
+        bullet.x += bullet.dx * dt;
+        bullet.y += bullet.dy * dt;
+        if (bullet.target && !bullet.target.remove) {
+          const distToTarget = dist(bullet.x, bullet.y, bullet.target.x, bullet.target.y);
+          if (distToTarget < 15) {
+            bullet.target.hp -= bullet.damage;
+            if (bullet.target.hp <= 0) {
+              bullet.target.remove = true;
+              score += 1;
+              gold += ENEMY_GOLD_DROP;
+            }
             bullet.remove = true;
           }
         }
-
-        // Update popups
-        for (let i = popups.length - 1; i >= 0; i--) {
-          popups[i].time -= dt;
-          popups[i].alpha = popups[i].time / 1.5;
-          popups[i].y -= dt * 50; // Move upward
-          if (popups[i].time <= 0) {
-            popups.splice(i, 1);
-          }
-        }
-
-        // Check end of wave
-        const activeEnemies = enemies.filter(e => !e.remove);
-        if (waveActive && spawnCount >= enemiesToSpawn && activeEnemies.length === 0) {
-          waveActive = false;
-          if (currentWave === 50) {
-            gameWon = true;
-            saveHighScore();
-          } else {
-            nextWaveTime = 5;
-          }
-        }
-
-        // Remove destroyed objects
-        for (let i = towers.length - 1; i >= 0; i--) {
-          if (towers[i].remove) towers.splice(i, 1);
-        }
-        for (let i = enemies.length - 1; i >= 0; i--) {
-          if (enemies[i].remove) enemies.splice(i, 1);
-        }
-        for (let i = bullets.length - 1; i >= 0; i--) {
-          if (bullets[i].remove) bullets.splice(i, 1);
-        }
-
-        // Update next wave timer
-        if (!waveActive && !gameWon) {
-          if (nextWaveTime > 0) {
-            nextWaveTime -= dt;
-            if (nextWaveTime <= 0) {
-              startWave();
-            }
-          }
-        }
-
-        // Drawing everything on canvas
-        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-        // Draw path outline
-        ctx.beginPath();
-        ctx.moveTo(path[0].x, path[0].y);
-        for (let i = 1; i < path.length; i++) {
-          ctx.lineTo(path[i].x, path[i].y);
-        }
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 10;
-        ctx.stroke();
-
-        // Draw towers with size scaling and level 5 glow
-        for (let t of towers) {
-          const size = TOWER_SIZE * (1 + 0.1 * (t.level - 1)); // 10% larger per level
-          if (t.level >= 5) {
-            ctx.shadowColor = 'red';
-            ctx.shadowBlur = 10;
-          } else {
-            ctx.shadowBlur = 0;
-          }
-          if (towerImg.complete && !imagesFailed) {
-            ctx.drawImage(towerImg, t.x - size/2, t.y - size/2, size, size);
-          } else {
-            ctx.fillStyle = 'blue';
-            ctx.fillRect(t.x - size/2, t.y - size/2, size, size);
-          }
-          const towerHealthRatio = t.hp / t.maxHp;
-          ctx.fillStyle = 'red';
-          ctx.fillRect(t.x - 20, t.y - size/2 - 10, 40, 5);
-          ctx.fillStyle = 'lime';
-          ctx.fillRect(t.x - 20, t.y - size/2 - 10, 40 * towerHealthRatio, 5);
-        }
-        ctx.shadowBlur = 0; // Reset shadow
-
-        // Draw enemies
-        for (let e of enemies) {
-          if (enemyImg.complete && !imagesFailed) {
-            ctx.drawImage(enemyImg, e.x - ENEMY_SIZE/2, e.y - ENEMY_SIZE/2, ENEMY_SIZE, ENEMY_SIZE);
-          } else {
-            ctx.fillStyle = 'red';
-            ctx.fillRect(e.x - ENEMY_SIZE/2, e.y - ENEMY_SIZE/2, ENEMY_SIZE, ENEMY_SIZE);
-          }
-          const enemyHealthRatio = e.hp / e.maxHp;
-          ctx.fillStyle = 'red';
-          ctx.fillRect(e.x - 20, e.y - ENEMY_SIZE/2 - 10, 40, 5);
-          ctx.fillStyle = 'lime';
-          ctx.fillRect(e.x - 20, e.y - ENEMY_SIZE/2 - 10, 40 * enemyHealthRatio, 5);
-        }
-
-        // Draw bullets
-        ctx.fillStyle = 'yellow';
-        for (let b of bullets) {
-          ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
-        }
-
-        // Draw popups
-        for (let popup of popups) {
-          ctx.fillStyle = `rgba(255, 0, 0, ${popup.alpha})`;
-          ctx.font = '20px sans-serif';
-          ctx.fillText(popup.text, popup.x, popup.y);
-        }
-
-        // Update UI text values
-        function updateUI() {
-          scoreEl.textContent = score;
-          goldEl.textContent = gold;
-          waveEl.textContent = waveActive ? currentWave : currentWave;
-          livesEl.textContent = lives;
-          heartsEl.textContent = '❤️'.repeat(lives);
-          if (!waveActive && nextWaveTime > 0) {
-            nextWaveEl.textContent = Math.ceil(nextWaveTime);
-          } else if (waveActive) {
-            nextWaveEl.textContent = '-';
-          } else {
-            nextWaveEl.textContent = '0';
-          }
-        }
-        updateUI();
-
-        // Loop again for next frame
-        requestAnimationFrame(gameLoop);
-      }
-
-      /** Show Try Again button **/
-      function showTryAgainButton() {
-        if (!document.getElementById('tryAgainButton')) {
-          const button = document.createElement('button');
-          button.id = 'tryAgainButton';
-          button.textContent = 'Try Again';
-          button.onclick = resetGame;
-          document.body.appendChild(button);
+        if (bullet.x < 0 || bullet.x > CANVAS_WIDTH || bullet.y < 0 || bullet.y > CANVAS_HEIGHT) {
+          bullet.remove = true;
         }
       }
+
+      // Update popups
+      for (let i = popups.length - 1; i >= 0; i--) {
+        popups[i].time -= dt;
+        popups[i].alpha = popups[i].time / 1.5;
+        popups[i].y -= dt * 50; // Move upward
+        if (popups[i].time <= 0) {
+          popups.splice(i, 1);
+        }
+      }
+
+      // Check end of wave
+      const activeEnemies = enemies.filter(e => !e.remove);
+      if (waveActive && spawnCount >= enemiesToSpawn && activeEnemies.length === 0) {
+        waveActive = false;
+        if (currentWave === 50) {
+          gameWon = true;
+          saveHighScore();
+        } else {
+          nextWaveTime = 5;
+        }
+      }
+
+      // Remove destroyed objects
+      for (let i = towers.length - 1; i >= 0; i--) {
+        if (towers[i].remove) towers.splice(i, 1);
+      }
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        if (enemies[i].remove) enemies.splice(i, 1);
+      }
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        if (bullets[i].remove) bullets.splice(i, 1);
+      }
+
+      // Update next wave timer
+      if (!waveActive && !gameWon) {
+        if (nextWaveTime > 0) {
+          nextWaveTime -= dt;
+          if (nextWaveTime <= 0) {
+            startWave();
+          }
+        }
+      }
+
+      // Drawing everything on canvas
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      // Draw path outline
+      ctx.beginPath();
+      ctx.moveTo(path[0].x, path[0].y);
+      for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+      }
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 10;
+      ctx.stroke();
+
+      // Draw towers with size scaling and level 5 glow
+      for (let t of towers) {
+        const size = TOWER_SIZE * (1 + 0.1 * (t.level - 1)); // 10% larger per level
+        if (t.level >= 5) {
+          ctx.shadowColor = 'red';
+          ctx.shadowBlur = 10;
+        } else {
+          ctx.shadowBlur = 0;
+        }
+        if (towerImg.complete && !imagesFailed) {
+          ctx.drawImage(towerImg, t.x - size/2, t.y - size/2, size, size);
+        } else {
+          ctx.fillStyle = 'blue';
+          ctx.fillRect(t.x - size/2, t.y - size/2, size, size);
+        }
+        const towerHealthRatio = t.hp / t.maxHp;
+        ctx.fillStyle = 'red';
+        ctx.fillRect(t.x - 20, t.y - size/2 - 10, 40, 5);
+        ctx.fillStyle = 'lime';
+        ctx.fillRect(t.x - 20, t.y - size/2 - 10, 40 * towerHealthRatio, 5);
+      }
+      ctx.shadowBlur = 0; // Reset shadow
+
+      // Draw enemies
+      for (let e of enemies) {
+        if (enemyImg.complete && !imagesFailed) {
+          ctx.drawImage(enemyImg, e.x - ENEMY_SIZE/2, e.y - ENEMY_SIZE/2, ENEMY_SIZE, ENEMY_SIZE);
+        } else {
+          ctx.fillStyle = 'red';
+          ctx.fillRect(e.x - ENEMY_SIZE/2, e.y - ENEMY_SIZE/2, ENEMY_SIZE, ENEMY_SIZE);
+        }
+        const enemyHealthRatio = e.hp / e.maxHp;
+        ctx.fillStyle = 'red';
+        ctx.fillRect(e.x - 20, e.y - ENEMY_SIZE/2 - 10, 40, 5);
+        ctx.fillStyle = 'lime';
+        ctx.fillRect(e.x - 20, e.y - ENEMY_SIZE/2 - 10, 40 * enemyHealthRatio, 5);
+      }
+
+      // Draw bullets
+      ctx.fillStyle = 'yellow';
+      for (let b of bullets) {
+        ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
+      }
+
+      // Draw popups
+      for (let popup of popups) {
+        ctx.fillStyle = `rgba(255, 0, 0, ${popup.alpha})`;
+        ctx.font = '20px sans-serif';
+        ctx.fillText(popup.text, popup.x, popup.y);
+      }
+
+      // Update UI text values
+      function updateUI() {
+        scoreEl.textContent = score;
+        goldEl.textContent = gold;
+        waveEl.textContent = waveActive ? currentWave : currentWave;
+        livesEl.textContent = lives;
+        heartsEl.textContent = '❤️'.repeat(lives);
+        if (!waveActive && nextWaveTime > 0) {
+          nextWaveEl.textContent = Math.ceil(nextWaveTime);
+        } else if (waveActive) {
+          nextWaveEl.textContent = '-';
+        } else {
+          nextWaveEl.textContent = '0';
+        }
+      }
+      updateUI();
+
+      // Loop again for next frame
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Show Try Again button
+    function showTryAgainButton() {
+      if (!document.getElementById('tryAgainButton')) {
+        const button = document.createElement('button');
+        button.id = 'tryAgainButton';
+        button.textContent = 'Try Again';
+        button.onclick = resetGame;
+        document.body.appendChild(button);
+      }
+    }
+
+    // Immediately Invoked Function for game logic
+    (() => {
+      // Initialize game
+      console.log('Game initialized');
     })();
   </script>
 </body>
