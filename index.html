@@ -28,6 +28,7 @@
     Gold: <span id="gold">0</span><br>
     Wave: <span id="wave">0</span><br>
     Next wave in: <span id="nextWave">0</span>s<br>
+    Lives: <span id="lives">10</span> <span id="hearts">❤️❤️❤️❤️❤️❤️❤️❤️❤️❤️</span><br>
     <small>Left-click to place tower, Right-click a tower to upgrade</small>
   </div>
   <script>
@@ -42,6 +43,7 @@
       const ENEMY_GOLD_DROP = 20;
       const TOWER_DAMAGE = 20, TOWER_RANGE = 100, TOWER_FIRE_RATE = 1.0;
       const TOWER_INITIAL_HP = 100, ENEMY_DAMAGE_TO_TOWER = 50;
+      const MAX_LIVES = 10;
 
       // Game State Variables
       let score = 0;
@@ -53,6 +55,12 @@
       let spawnCount = 0;
       const spawnInterval = 0.5;
       let spawnTimer = 0;
+      let lives = MAX_LIVES;
+      let gameOver = false;
+      let gameWon = false;
+
+      // Popup for life loss
+      const popups = [];
 
       // Game Object Arrays
       const towers = [];
@@ -74,6 +82,8 @@
       const goldEl = document.getElementById('gold');
       const waveEl = document.getElementById('wave');
       const nextWaveEl = document.getElementById('nextWave');
+      const livesEl = document.getElementById('lives');
+      const heartsEl = document.getElementById('hearts');
 
       // Load tower and enemy images with fallback
       const towerImg = new Image();
@@ -142,6 +152,7 @@
 
       /** Event: Left-click to place a new tower **/
       canvas.addEventListener('click', e => {
+        if (gameOver || gameWon) return;
         const rect = canvas.getBoundingClientRect();
         const cx = e.clientX - rect.left;
         const cy = e.clientY - rect.top;
@@ -177,6 +188,7 @@
       /** Event: Right-click on a tower to upgrade it **/
       canvas.addEventListener('contextmenu', e => {
         e.preventDefault();
+        if (gameOver || gameWon) return;
         const rect = canvas.getBoundingClientRect();
         const cx = e.clientX - rect.left;
         const cy = e.clientY - rect.top;
@@ -190,7 +202,6 @@
               tower.range *= 1.2;
               tower.maxHp += 50;
               tower.hp = tower.maxHp;
-              // At level 5 (upgrade cost = 250), double shooting speed
               if (tower.level === 5) {
                 tower.fireRate = TOWER_FIRE_RATE / 2; // Shoot twice as fast
               }
@@ -206,6 +217,20 @@
         if (!lastTime) lastTime = timestamp;
         const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
         lastTime = timestamp;
+
+        if (gameOver) {
+          ctx.fillStyle = 'red';
+          ctx.font = '48px sans-serif';
+          ctx.fillText('Game Over', CANVAS_WIDTH / 2 - 100, CANVAS_HEIGHT / 2);
+          return;
+        }
+
+        if (gameWon) {
+          ctx.fillStyle = 'green';
+          ctx.font = '48px sans-serif';
+          ctx.fillText(`GG! Final Score: ${score}`, CANVAS_WIDTH / 2 - 150, CANVAS_HEIGHT / 2);
+          return;
+        }
 
         // Spawn enemies for current wave
         if (waveActive) {
@@ -229,7 +254,18 @@
             enemy.y = target.y;
             enemy.waypointIndex += 1;
             if (enemy.waypointIndex >= path.length) {
+              lives -= 1;
+              popups.push({
+                x: CANVAS_WIDTH - 50,
+                y: CANVAS_HEIGHT / 2,
+                text: '-1 Life',
+                alpha: 1,
+                time: 1.5 // seconds
+              });
               enemy.remove = true;
+              if (lives <= 0) {
+                gameOver = true;
+              }
             }
           } else {
             enemy.x += (dx / distance) * enemy.speed * dt;
@@ -303,11 +339,25 @@
           }
         }
 
+        // Update popups
+        for (let i = popups.length - 1; i >= 0; i--) {
+          popups[i].time -= dt;
+          popups[i].alpha = popups[i].time / 1.5;
+          popups[i].y -= dt * 50; // Move upward
+          if (popups[i].time <= 0) {
+            popups.splice(i, 1);
+          }
+        }
+
         // Check end of wave
         const activeEnemies = enemies.filter(e => !e.remove);
         if (waveActive && spawnCount >= enemiesToSpawn && activeEnemies.length === 0) {
           waveActive = false;
-          nextWaveTime = 5;
+          if (currentWave === 50) {
+            gameWon = true;
+          } else {
+            nextWaveTime = 5;
+          }
         }
 
         // Remove destroyed objects
@@ -322,7 +372,7 @@
         }
 
         // Update next wave timer
-        if (!waveActive) {
+        if (!waveActive && !gameWon) {
           if (nextWaveTime > 0) {
             nextWaveTime -= dt;
             if (nextWaveTime <= 0) {
@@ -378,10 +428,19 @@
           ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
         }
 
+        // Draw popups
+        for (let popup of popups) {
+          ctx.fillStyle = `rgba(255, 0, 0, ${popup.alpha})`;
+          ctx.font = '20px sans-serif';
+          ctx.fillText(popup.text, popup.x, popup.y);
+        }
+
         // Update UI text values
         scoreEl.textContent = score;
         goldEl.textContent = gold;
         waveEl.textContent = waveActive ? currentWave : currentWave;
+        livesEl.textContent = lives;
+        heartsEl.textContent = '❤️'.repeat(lives);
         if (!waveActive && nextWaveTime > 0) {
           nextWaveEl.textContent = Math.ceil(nextWaveTime);
         } else if (waveActive) {
